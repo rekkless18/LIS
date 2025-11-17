@@ -21,6 +21,15 @@
   2. `pnpm install`
   3. `pnpm run server:dev`
 
+### 前后端一起启动（单窗口）
+- 使用 `concurrently` 在项目根目录一次性启动前后端（PowerShell 分别执行以下命令，无需使用 `&&`）：
+  1. `cd d:\LIS`
+  2. `pnpm dlx concurrently "pnpm -C lis-frontend dev --host --port 5173" "pnpm -C lis-backend run server:dev"`
+- 说明：
+  - 若端口被占用，前端会自动切换到其他端口（例如 5174）；后端默认 `3001`，可在 `.env` 中设置 `PORT`。
+  - 如使用 npm，可替换为：`npx concurrently "npm --prefix lis-frontend run dev -- --host --port 5173" "npm --prefix lis-backend run server:dev"`
+  - 如不希望安装 `dlx` 临时包，可在两个独立终端分别执行前后端启动命令。
+
 ## 生产构建与直接部署（无 Docker）
 - 前端：构建并部署静态资源
   1. `cd lis-frontend`
@@ -41,6 +50,7 @@
 ## 端口与访问
 - 前端开发访问：`http://localhost:5173/`
 - 后端开发健康检查：`http://localhost:3001/api/health`
+ - 前端默认后端地址：`http://localhost:3001`（可通过 `.env` 设置 `VITE_API_BASE_URL`）
 
 ## 注意事项
 - PowerShell 不支持 `&&` 链式语法，命令请逐行执行。
