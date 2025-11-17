@@ -1,0 +1,24 @@
+import React from 'react';
+import { Table, Tooltip } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
+import { useRoutineExceptionStore } from '@/stores/routineException';
+export const RoutineExceptionTable: React.FC = () => {
+  const { filteredRecords, selectedRowKeys, setSelectedRowKeys } = useRoutineExceptionStore();
+  const rowSelection = { selectedRowKeys, onChange: (keys: React.Key[]) => setSelectedRowKeys(keys as string[]) };
+  const columns: ColumnsType<any> = [
+    { title: '', dataIndex: 'id', key: 'id', width: 48, fixed: 'left', render: () => null },
+    { title: '异常编号', dataIndex: 'exceptionNo', key: 'exceptionNo', width: 160, fixed: 'left', render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40 text-blue-600">{text}</span></Tooltip>) },
+    { title: '实验编号', dataIndex: 'experimentNo', key: 'experimentNo', width: 160, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text}</span></Tooltip>) },
+    { title: '样本编号', dataIndex: 'sampleNo', key: 'sampleNo', width: 160, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text}</span></Tooltip>) },
+    { title: '产品名称', dataIndex: 'productName', key: 'productName', width: 200, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text}</span></Tooltip>) },
+    { title: '检测项名称', dataIndex: 'testItemName', key: 'testItemName', width: 200, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text}</span></Tooltip>) },
+    { title: '异常类型', dataIndex: 'type', key: 'type', width: 120, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-20">{text}</span></Tooltip>) },
+    { title: '异常状态', dataIndex: 'status', key: 'status', width: 120, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-20">{text}</span></Tooltip>) },
+    { title: '发现人', dataIndex: 'discoverer', key: 'discoverer', width: 100, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-20">{text}</span></Tooltip>) },
+    { title: '发现时间', dataIndex: 'discoverTime', key: 'discoverTime', width: 160, render: (text: string) => { if (!text) return ''; const d = new Date(text); const s = d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); return (<Tooltip title={s}><span className="truncate block max-w-40">{s}</span></Tooltip>); } },
+    { title: '处理人', dataIndex: 'handler', key: 'handler', width: 100, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-20">{text}</span></Tooltip>) },
+    { title: '处理时间', dataIndex: 'handleTime', key: 'handleTime', width: 160, render: (text: string) => { if (!text) return ''; const d = new Date(text); const s = d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); return (<Tooltip title={s}><span className="truncate block max-w-40">{s}</span></Tooltip>); } }
+  ];
+  const totalWidth = columns.reduce((sum, col) => sum + (typeof col.width === 'number' ? col.width : 120), 0);
+  return (<Table rowKey="id" rowSelection={rowSelection} columns={columns} dataSource={filteredRecords} scroll={{ x: totalWidth }} pagination={false} className="cursor-pointer" />);
+};

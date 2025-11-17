@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.5;
+  font-weight: 400;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  width: 100%;
+  overflow-x: hidden;
+}
+
+/* 列表区域仅在表格内横向滚动 */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+.ant-table-container,
+.ant-table-content {
+  width: max-content;
+}
+
+/* 统一表格行高（方案一：全局样式覆盖） */
+/* 说明：设置表头与表体单元格的上下内边距为10px，结合默认字体行高，近似形成一致的行高（约40px） */
+.ant-table-thead > tr > th {
+  /* 设置表头单元格上内边距10px */
+  padding-top: 10px;
+  /* 设置表头单元格下内边距10px */
+  padding-bottom: 10px;
+}
+.ant-table-tbody > tr > td {
+  /* 设置表体单元格上内边距10px */
+  padding-top: 10px;
+  /* 设置表体单元格下内边距10px */
+  padding-bottom: 10px;
+  /* 禁止换行，避免内容多行导致行高不一致 */
+  white-space: nowrap;
+  /* 超出内容省略显示，避免撑高或溢出 */
+  overflow: hidden;
+  /* 文本超出时显示省略号 */
+  text-overflow: ellipsis;
+}
