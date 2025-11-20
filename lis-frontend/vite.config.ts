@@ -9,6 +9,13 @@ export default defineConfig({
   build: {
     sourcemap: 'hidden',
   },
+   server: {
+    // 允许的主机列表，添加 lis.erikwang.online
+    allowedHosts: ['lis.erikwang.online', 'localhost', '127.0.0.1'],
+    // 保持你原本的启动参数（--host --port 5173），也可以在这里配置（二选一即可）
+    host: true, // 等价于 --host，允许外部访问
+    port: 5173, // 等价于 --port 5173，指定端口
+  },
   plugins: [
     react({
       babel: {

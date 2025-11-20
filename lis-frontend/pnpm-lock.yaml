@@ -17,6 +17,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      dayjs:
+        specifier: ^1.11.11
+        version: 1.11.19
       lucide-react:
         specifier: ^0.511.0
         version: 0.511.0(react@18.3.1)

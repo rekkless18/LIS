@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Card, Pagination } from 'antd'
 import { InventorySearchPanel } from '@/components/inventory/InventorySearchPanel'
 import { InventoryActionBar } from '@/components/inventory/InventoryActionBar'
@@ -7,7 +7,8 @@ import { useInventoryStore } from '@/stores/inventory'
 
 const InventoryQuery: React.FC = () => {
   const { query, pagination, setPagination, resetFilters } = useInventoryStore()
-  useEffect(() => { query() }, [])
+  const mountedRef = useRef(false)
+  useEffect(() => { if (mountedRef.current) return; mountedRef.current = true; query() }, [])
   const handleSearch = () => { setPagination({ current: 1 }); query() }
   const handleReset = () => { resetFilters(); setPagination({ current: 1 }); query() }
   const onPageChange = (page: number, pageSize?: number) => { setPagination({ current: page, pageSize: pageSize || pagination.pageSize }); query() }

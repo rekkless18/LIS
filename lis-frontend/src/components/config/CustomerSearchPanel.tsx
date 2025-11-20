@@ -20,9 +20,9 @@ export const CustomerSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
     form.setFieldsValue({
       codes: filters.codes?.join(', ') || '',
       nameKeyword: filters.nameKeyword || '',
-      types: filters.types || typeOptions,
-      regions: filters.regions || regionOptions,
-      statuses: filters.statuses || statusOptions,
+      types: filters.types?.[0] || undefined,
+      regions: filters.regions?.[0] || undefined,
+      statuses: filters.statuses?.[0] || undefined,
       createdRange: undefined
     });
   }, [filters, form]);
@@ -32,9 +32,9 @@ export const CustomerSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
       const next = {
         codes: values.codes ? values.codes.split(',').map((s: string) => s.trim()).filter(Boolean) : undefined,
         nameKeyword: values.nameKeyword || undefined,
-        types: values.types || undefined,
-        regions: values.regions || undefined,
-        statuses: values.statuses || undefined,
+        types: values.types ? [values.types as CustomerType] : undefined,
+        regions: values.regions ? [values.regions as Region] : undefined,
+        statuses: values.statuses ? [values.statuses as EnableStatus] : undefined,
         createdRange: values.createdRange ? [values.createdRange[0].toDate().toISOString(), values.createdRange[1].toDate().toISOString()] as [string, string] : undefined
       };
       setFilters(next);
@@ -50,13 +50,13 @@ export const CustomerSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
         <Row gutter={16}>
           <Col xs={24} sm={12} md={6}><Form.Item label="客户编码" name="codes"><Input placeholder="多个客户编码用英文逗号分隔" /></Form.Item></Col>
           <Col xs={24} sm={12} md={6}><Form.Item label="客户名称" name="nameKeyword"><Input placeholder="请输入客户名称" /></Form.Item></Col>
-          <Col xs={24} sm={12} md={6}><Form.Item label="客户类型" name="types"><Select mode="multiple" placeholder="请选择客户类型">{typeOptions.map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item></Col>
-          <Col xs={24} sm={12} md={6}><Form.Item label="区域" name="regions"><Select mode="multiple" placeholder="请选择区域">{regionOptions.map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item></Col>
+          <Col xs={24} sm={12} md={6}><Form.Item label="客户类型" name="types"><Select placeholder="请选择客户类型">{typeOptions.map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item></Col>
+          <Col xs={24} sm={12} md={6}><Form.Item label="区域" name="regions"><Select placeholder="请选择区域">{regionOptions.map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item></Col>
         </Row>
         {!collapsed && (
           <>
             <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}><Form.Item label="状态" name="statuses"><Select mode="multiple" placeholder="请选择状态">{statusOptions.map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item></Col>
+              <Col xs={24} sm={12} md={6}><Form.Item label="状态" name="statuses"><Select placeholder="请选择状态">{statusOptions.map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item></Col>
               <Col xs={24} sm={12} md={6}><Form.Item label="创建日期" name="createdRange"><RangePicker format="YYYY-MM-DD" /></Form.Item></Col>
             </Row>
           </>

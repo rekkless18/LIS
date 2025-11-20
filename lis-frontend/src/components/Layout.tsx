@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth';
+import { pathPermissionMap } from '@/router';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 
@@ -10,6 +12,8 @@ import { Sidebar } from './Sidebar';
  */
 export const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const { user } = useAuthStore();
 
   /**
    * 切换侧边栏折叠状态
@@ -39,7 +43,27 @@ export const Layout: React.FC = () => {
         
         {/* 内容区域 - 全白色背景 */}
         <main className="flex-1 p-6 bg-white overflow-y-auto overflow-x-hidden">
-          <Outlet />
+          {(() => {
+            let perm = pathPermissionMap[location.pathname];
+            if (!perm) {
+              for (const [pattern, p] of Object.entries(pathPermissionMap)) {
+                const re = new RegExp('^' + pattern.replace(/:[^/]+/g, '[^/]+') + '$')
+                if (re.test(location.pathname)) { perm = p; break; }
+              }
+            }
+            if (perm) {
+              const alt = perm.endsWith('.view') ? perm.replace(/\.view$/, '') : ''
+              const has = user?.permissions?.includes(perm) || (alt && user?.permissions?.includes(alt))
+              if (!has) {
+                return (
+                  <div className="w-full h-full flex items-center justify-center text-gray-700">
+                    无权限，请联系系统管理员
+                  </div>
+                );
+              }
+            }
+            return <Outlet />;
+          })()}
         </main>
       </div>
     </div>

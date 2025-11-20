@@ -78,6 +78,9 @@ export const useAuthStore = create<AuthState>()(
           }
           const user = data.user as User
           const token = data.token as string
+          if (!user.roles || user.roles.length === 0) {
+            throw new Error('该账号未配置角色，请联系系统管理员')
+          }
           set({
             user,
             token,

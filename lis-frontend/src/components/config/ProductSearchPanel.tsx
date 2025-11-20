@@ -47,7 +47,7 @@ export const ProductSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
         {!collapsed && (
           <>
             <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}><Form.Item label="创建日期" name="createdRange"><RangePicker format="YYYY-MM-DD" /></Form.Item></Col>
+              <Col xs={24} sm={12} md={6}><Form.Item label="创建日期" name="createdRange"><RangePicker format="YYYY-MM-DD" placeholder={["开始日期","结束日期"]} /></Form.Item></Col>
             </Row>
           </>
         )}

@@ -4,6 +4,7 @@ import { PlusOutlined, EditOutlined, ClockCircleOutlined, DeleteOutlined, Reload
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '@/stores/order';
 import { UrgentReasonModal } from '../modals/UrgentReasonModal';
+import { useAuthStore } from '@/stores/auth';
 import { VoidConfirmModal } from '../modals/VoidConfirmModal';
 import { OrderTypeSelectModal } from '../modals/OrderTypeSelectModal';
 
@@ -59,12 +60,36 @@ export const OrderActionBar: React.FC<OrderActionBarProps> = ({ onSearch, onRese
     setVoidModalVisible(true);
   };
 
-  const handleUrgentConfirm = (reason: string, type: string) => {
-    markUrgent(selectedRowKeys, reason, type);
-    setUrgentModalVisible(false);
-    message.success('订单加急成功');
-    onSearch();
-  };
+  const handleUrgentConfirm = async (reason: string, type: string, requestCode: string) => {
+    try {
+      const API_BASE = (import.meta.env.VITE_API_BASE as string) || 'http://localhost:3001/api'
+      const userId = useAuthStore.getState().user?.id || ''
+      const selected = filteredOrders.filter(o => selectedRowKeys.includes(o.id))
+      const orderNos = selected.map(o => o.orderNo)
+      const sampleNos = selected.flatMap(o => o.sampleNos || [])
+      const productNames = selected.flatMap(o => (o.items || []).map(it => it.product?.name).filter(Boolean))
+      const resp = await fetch(`${API_BASE}/approval/requests`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flow_type: 'urgent',
+          applicant_id: userId,
+          urgent_type: type,
+          reason,
+          order_nos: orderNos,
+          sample_nos: sampleNos,
+          product_names: productNames,
+          request_code: requestCode
+        })
+      })
+      const json = await resp.json()
+      if (!resp.ok || !json?.success) throw new Error(json?.error || '加急审批提交失败')
+      setUrgentModalVisible(false)
+      message.success(`加急审批提交成功：${requestCode}`)
+    } catch (e: any) {
+      message.error(e?.message || '加急审批提交失败')
+    }
+  }
 
   const handleVoidConfirm = () => {
     voidOrders(selectedRowKeys);

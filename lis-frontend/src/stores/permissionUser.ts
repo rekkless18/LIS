@@ -10,9 +10,10 @@ export interface UserItem {
   name: string
   userType: UserType
   status: EnableStatus
-  roles: string[]
+  roles?: string[]
   email?: string
   phone?: string
+  department?: string
   lastLoginTime?: string
   lastPasswordChange?: string
   createdAt?: string
@@ -25,6 +26,7 @@ export interface UserFilters {
   nameKeyword?: string
   userTypes?: UserType[]
   statuses?: EnableStatus[]
+  departments?: string[]
   lastLoginRange?: [string, string]
   lastPwdChangeRange?: [string, string]
   createdRange?: [string, string]
@@ -68,13 +70,17 @@ interface Actions {
   /** 函数功能：配置角色；参数：ID与角色数组；返回值：void；用途：更新绑定角色 */
   setRoles: (id: string, roles: string[]) => void
   /** 函数功能：重置密码；参数：ID；返回值：新密码字符串；用途：生成随机密码并更新最后修改时间 */
-  resetPassword: (id: string) => string
+  resetPassword: (id: string) => Promise<string>
   resetFilters: () => void
 }
 
 const mock: UserItem[] = []
 
-const defaultFilters: UserFilters = { userTypes: ['内部用户','外部用户'], statuses: ['启用','禁用'] }
+const defaultFilters: UserFilters = {
+  userTypes: ['内部用户','外部用户'],
+  statuses: ['启用','禁用'],
+  departments: ['销售部','采购部','门诊部','检验科','财务部','人力部','后勤部','行政部','其他','运维部']
+}
 const defaultPagination: PaginationConfig = { current: 1, pageSize: 20, total: 0, showSizeChanger: true, pageSizeOptions: ['10','20','50','100'] }
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string) || 'http://localhost:3001/api'
@@ -108,6 +114,7 @@ export const useUserConfigStore = create<State & Actions>()(
           roles: (u.roles || []) as string[],
           email: u.email || undefined,
           phone: u.phone || undefined,
+          department: (u.department ?? u.dept ?? u.dept_cn ?? u.department_cn ?? u.departmentName ?? u.dept_name) || undefined,
           lastLoginTime: u.last_login_at || undefined,
           lastPasswordChange: u.last_password_change_at || undefined,
           createdAt: u.created_at || undefined,
@@ -118,6 +125,7 @@ export const useUserConfigStore = create<State & Actions>()(
         if (filters.nameKeyword) list = list.filter(d => d.name.includes(filters.nameKeyword!))
         if (filters.userTypes?.length) list = list.filter(d => filters.userTypes!.includes(d.userType))
         if (filters.statuses?.length) list = list.filter(d => filters.statuses!.includes(d.status))
+        if (filters.departments?.length) list = list.filter(d => d.department && filters.departments!.includes(d.department))
         const inRange = (iso?: string, range?: [string,string]) => (iso && range) ? (new Date(iso) >= new Date(range[0]) && new Date(iso) <= new Date(range[1])) : false
         if (filters.lastLoginRange) list = list.filter(d => inRange(d.lastLoginTime, filters.lastLoginRange))
         if (filters.lastPwdChangeRange) list = list.filter(d => inRange(d.lastPasswordChange, filters.lastPwdChangeRange))
@@ -128,7 +136,7 @@ export const useUserConfigStore = create<State & Actions>()(
       },
       /** 函数功能：新建用户；参数：用户数据；返回值：void；用途：调用后端添加并刷新 */
       createItem: async (it) => {
-        const payload = { account: it.account, name: it.name, user_type: it.userType === '内部用户' ? 'internal' : 'external', status: it.status === '启用' ? 'enabled' : 'disabled', email: it.email, phone: it.phone }
+        const payload = { account: it.account, name: it.name, user_type: it.userType === '内部用户' ? 'internal' : 'external', status: it.status === '启用' ? 'enabled' : 'disabled', email: it.email, phone: it.phone, department: it.department }
         const resp = await fetch(`${API_BASE}/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         const json = await resp.json()
         const newId = json.id as string
@@ -136,7 +144,7 @@ export const useUserConfigStore = create<State & Actions>()(
           // 将角色名称映射为角色ID后保存绑定关系
           const roleResp = await fetch(`${API_BASE}/roles`)
           const roleJson = await roleResp.json()
-          const roleMap: Record<string, string> = {}
+          const roleMap: Record<string, string> = {};
           (roleJson.data || []).forEach((r: any) => { roleMap[r.role_name] = r.id })
           const roleIds = it.roles.map((name) => roleMap[name]).filter(Boolean)
           if (roleIds.length) await fetch(`${API_BASE}/users/${newId}/roles`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role_ids: roleIds }) })
@@ -152,11 +160,12 @@ export const useUserConfigStore = create<State & Actions>()(
         if (patch.status) payload.status = patch.status === '启用' ? 'enabled' : 'disabled'
         if (patch.email) payload.email = patch.email
         if (patch.phone) payload.phone = patch.phone
+        if (patch.department) payload.department = patch.department
         await fetch(`${API_BASE}/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         if (patch.roles) {
           const roleResp = await fetch(`${API_BASE}/roles`)
           const roleJson = await roleResp.json()
-          const roleMap: Record<string, string> = {}
+          const roleMap: Record<string, string> = {};
           (roleJson.data || []).forEach((r: any) => { roleMap[r.role_name] = r.id })
           const roleIds = patch.roles.map((name) => roleMap[name]).filter(Boolean)
           await fetch(`${API_BASE}/users/${id}/roles`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role_ids: roleIds }) })

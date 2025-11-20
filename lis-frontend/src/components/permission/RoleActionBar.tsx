@@ -26,7 +26,9 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
       const resp = await fetch(`${API_BASE}/permissions`)
       const json = await resp.json()
       const list: any[] = json.data || []
+      const KEY_MAP: Record<string, string> = { '/home': 'home' }
       const GROUP_LABELS: Record<string, string> = {
+        home: '首页',
         order: '订单管理',
         logistics: '物流管理',
         samples: '样本管理',
@@ -45,6 +47,7 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
         ms: '质谱'
       }
       const ALLOWED_LEAF_PATHS = new Set<string>([
+        '/home',
         '/order/orderquery','/order/sample','/order/delivery',
         '/logistics/logisticsquery',
         '/samples/samplesquery',
@@ -60,6 +63,7 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
         '/system/global'
       ])
       const groups: Record<string, any> = {}
+      const extraNodes: any[] = []
       list.forEach((p: any) => {
         const rp: string = p.route_path || ''
         if (!ALLOWED_LEAF_PATHS.has(rp)) return
@@ -69,22 +73,33 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
         const groupKey = top === 'sample' ? 'samples' : top
         const groupLabel = GROUP_LABELS[groupKey]
         if (!groupLabel) return
-        if (!groups[groupKey]) groups[groupKey] = { title: groupLabel, key: groupKey, children: [] }
+        const leafKey = KEY_MAP[rp] || p.perm_key
+        if (groupKey === 'home') {
+          extraNodes.push({ title: p.perm_name || '首页', key: leafKey, sortKey: 'home' })
+          return
+        }
+        if (!groups[groupKey]) groups[groupKey] = { title: groupLabel, key: `group:${groupKey}`, children: [], sortKey: groupKey }
         if (groupKey === 'test' && parts.length >= 3) {
           const sec = parts[1]
           const secLabel = TEST_SECOND_LABELS[sec]
           if (!secLabel) return
-          let secNode = groups[groupKey].children.find((n: any) => n.key === `test:${sec}`)
+          let secNode = groups[groupKey].children.find((n: any) => n.key === `group:test:${sec}`)
           if (!secNode) {
-            secNode = { title: secLabel, key: `test:${sec}`, children: [] }
+            secNode = { title: secLabel, key: `group:test:${sec}`, children: [] }
             groups[groupKey].children.push(secNode)
           }
-          secNode.children.push({ title: p.perm_name, key: p.perm_key })
+          secNode.children.push({ title: p.perm_name, key: leafKey })
         } else {
-          groups[groupKey].children.push({ title: p.perm_name, key: p.perm_key })
+          groups[groupKey].children.push({ title: p.perm_name, key: leafKey })
         }
       })
-      const nodes = Object.values(groups)
+      const nodes = [...extraNodes, ...Object.values(groups)]
+      const MENU_ORDER = ['home','order','logistics','samples','test','report','labmanage','inventory','approval','config','permission','system']
+      ;(nodes as any[]).sort((a: any, b: any) => {
+        const ia = MENU_ORDER.indexOf(a.sortKey)
+        const ib = MENU_ORDER.indexOf(b.sortKey)
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib)
+      })
       setTreeData(nodes as any[])
     }
     loadPerms()
@@ -123,7 +138,7 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
   const handleCreateSubmit = () => {
     // 功能：提交新建角色；参数：表单值；返回：刷新数据
     form.validateFields().then(values => {
-      createItem({ roleCode: values.roleCode, roleName: values.roleName, roleType: values.roleType as RoleType, status: values.status as EnableStatus, boundUserCount: 0, createdAt: new Date().toISOString() })
+      createItem({ roleCode: values.roleCode, roleName: values.roleName, roleType: values.roleType as RoleType, status: '启用', boundUserCount: 0, createdAt: new Date().toISOString() })
       setOpenCreate(false)
     })
   }
@@ -133,14 +148,14 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
     if (selectedRowKeys.length !== 1) return
     const target = filteredItems.find(d => d.id === selectedRowKeys[0])
     if (!target) return
-    form.setFieldsValue({ roleCode: target.roleCode, roleName: target.roleName, roleType: target.roleType, status: target.status })
+    form.setFieldsValue({ roleCode: target.roleCode, roleName: target.roleName, roleType: target.roleType })
     setOpenEdit(true)
   }
   const handleEditSubmit = () => {
     // 功能：提交编辑；参数：表单值与选中ID；返回：刷新数据
     const id = selectedRowKeys[0] as string
     form.validateFields().then(values => {
-      editItem(id, { roleCode: values.roleCode, roleName: values.roleName, roleType: values.roleType as RoleType, status: values.status as EnableStatus })
+      editItem(id, { roleCode: values.roleCode, roleName: values.roleName, roleType: values.roleType as RoleType })
       setOpenEdit(false)
     })
   }
@@ -199,7 +214,6 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
           <Form.Item label="角色编码" name="roleCode" rules={[{ required: true, message: '请输入角色编码' }]}><Input /></Form.Item>
           <Form.Item label="角色名称" name="roleName" rules={[{ required: true, message: '请输入角色名称' }]}><Input /></Form.Item>
           <Form.Item label="角色类型" name="roleType" rules={[{ required: true, message: '请选择角色类型' }]}><Select placeholder="请选择">{(['内部角色','外部角色'] as RoleType[]).map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item>
-          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select placeholder="请选择">{(['启用','禁用'] as EnableStatus[]).map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item>
         </Form>
       </Modal>
 
@@ -208,7 +222,6 @@ export const RoleActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
           <Form.Item label="角色编码" name="roleCode" rules={[{ required: true, message: '请输入角色编码' }]}><Input /></Form.Item>
           <Form.Item label="角色名称" name="roleName" rules={[{ required: true, message: '请输入角色名称' }]}><Input /></Form.Item>
           <Form.Item label="角色类型" name="roleType" rules={[{ required: true, message: '请选择角色类型' }]}><Select placeholder="请选择">{(['内部角色','外部角色'] as RoleType[]).map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item>
-          <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select placeholder="请选择">{(['启用','禁用'] as EnableStatus[]).map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item>
         </Form>
       </Modal>
 

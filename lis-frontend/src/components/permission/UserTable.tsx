@@ -14,6 +14,7 @@ export const UserTable: React.FC = () => {
     { title: '用户姓名', dataIndex: 'name', key: 'name', width: 160, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text}</span></Tooltip>) },
     { title: '用户类型', dataIndex: 'userType', key: 'userType', width: 120 },
     { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
+    { title: '部门', dataIndex: 'department', key: 'department', width: 160, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text || ''}</span></Tooltip>) },
     { title: '绑定角色', dataIndex: 'roles', key: 'roles', width: 240, render: (_: any, record: any) => {
       const names: string[] = Array.isArray(record.roles) ? record.roles : []
       return names.length ? (
@@ -24,7 +25,7 @@ export const UserTable: React.FC = () => {
     } },
     { title: '最后登录时间', dataIndex: 'lastLoginTime', key: 'lastLoginTime', width: 180, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
     { title: '最后修改密码时间', dataIndex: 'lastPasswordChange', key: 'lastPasswordChange', width: 180, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
-    { title: '创建日期', dataIndex: 'createdAt', key: 'createdAt', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) }
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) }
   ]
   const totalWidth = columns.reduce((sum, col) => sum + (typeof col.width === 'number' ? col.width : 120), 0)
   return (<Table rowKey="id" rowSelection={rowSelection} columns={columns} dataSource={filteredItems} scroll={{ x: totalWidth }} pagination={false} />)

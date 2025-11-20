@@ -1,23 +1,28 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { useAuthStore } from './auth'
 
 export type ApprovalType = '加急申请' | '库存采购申请' | '请假申请'
-export type ApprovalStatus = '已审批' | '已通过' | '已驳回'
+export type ApprovalLevel = '一级审批' | '二级审批' | '三级审批'
+export type ApprovalStatus = '审批中' | '已通过' | '已驳回' | '已撤回'
 
 export interface Approval {
   id: string
   approvalNo: string
   type: ApprovalType
+  flowName: string
+  level: ApprovalLevel
   status: ApprovalStatus
   createdDate?: string
   applicant?: string
-  title?: string
+  nodes?: { label: string; status: ApprovalStatus }[]
   content?: string
 }
 
 export interface ApprovalFilters {
   approvalNos?: string[]
   types?: ApprovalType[]
+  levels?: ApprovalLevel[]
   statuses?: ApprovalStatus[]
   createdDate?: string
   applicantKeyword?: string
@@ -49,15 +54,13 @@ interface Actions {
   resetFilters: () => void
 }
 
-const mock: Approval[] = [
-  { id: 'a1', approvalNo: 'APR-001', type: '加急申请', status: '已审批', createdDate: new Date().toISOString(), applicant: '张三', title: '订单加急', content: '需要对订单O-1001进行加急处理' },
-  { id: 'a2', approvalNo: 'APR-002', type: '库存采购申请', status: '已审批', createdDate: new Date().toISOString(), applicant: '李四', title: '试剂采购', content: '采购试剂A 100瓶' },
-  { id: 'a3', approvalNo: 'APR-003', type: '请假申请', status: '已审批', createdDate: new Date().toISOString(), applicant: '王五', title: '事假申请', content: '因家事请假一天' }
-]
+const mock: Approval[] = []
 
-const defaultFilters: ApprovalFilters = { types: ['加急申请','库存采购申请','请假申请'], statuses: ['已审批','已通过','已驳回'] }
+const defaultFilters: ApprovalFilters = { types: ['加急申请','库存采购申请','请假申请'], levels: ['一级审批','二级审批','三级审批'] }
 
 const defaultPagination: PaginationConfig = { current: 1, pageSize: 20, total: 0, showSizeChanger: true, pageSizeOptions: ['10','20','50','100'] }
+
+const API_BASE = (import.meta.env.VITE_API_BASE as string) || 'http://localhost:3001/api'
 
 export const useApprovalStore = create<State & Actions>()(
   persist(
@@ -71,23 +74,37 @@ export const useApprovalStore = create<State & Actions>()(
       setPagination: (p) => set((s) => ({ pagination: { ...s.pagination, ...p } })),
       setSelectedRowKeys: (k) => set({ selectedRowKeys: k }),
       resetFilters: () => set({ filters: defaultFilters }),
-      query: () => {
-        const { items, filters, pagination } = get()
-        let list = [...items]
-        if (filters.approvalNos?.length) list = list.filter(d => filters.approvalNos!.some(no => d.approvalNo.includes(no)))
-        if (filters.types?.length) list = list.filter(d => filters.types!.includes(d.type))
-        if (filters.statuses?.length) list = list.filter(d => filters.statuses!.includes(d.status))
-        if (filters.createdDate) list = list.filter(d => d.createdDate ? new Date(d.createdDate).toLocaleDateString('zh-CN') === new Date(filters.createdDate!).toLocaleDateString('zh-CN') : false)
-        if (filters.applicantKeyword) list = list.filter(d => (d.applicant || '').includes(filters.applicantKeyword!))
-        const startIdx = (pagination.current - 1) * pagination.pageSize
-        const page = list.slice(startIdx, startIdx + pagination.pageSize)
-        set({ filteredItems: page, pagination: { ...pagination, total: list.length } })
+      query: async () => {
+        const { filters, pagination } = get()
+        const params = new URLSearchParams()
+        if (filters.approvalNos?.length) params.set('approvalNos', filters.approvalNos.join(','))
+        if (filters.types?.length) params.set('types', filters.types.join(','))
+        if (filters.levels?.length) params.set('levels', filters.levels.join(','))
+        if (filters.statuses?.length) params.set('statuses', filters.statuses.join(','))
+        if (filters.createdDate) params.set('createdDate', filters.createdDate)
+        if (filters.applicantKeyword) params.set('applicantKeyword', filters.applicantKeyword)
+        params.set('pageNo', String(pagination.current))
+        params.set('pageSize', String(pagination.pageSize))
+        const userId = (useAuthStore.getState().user?.id) || ''
+        if (userId) params.set('current_user_id', userId)
+        const resp = await fetch(`${API_BASE}/approval/requests?${params.toString()}`)
+        const json = await resp.json()
+        const rows = (json.data || []) as Approval[]
+        const startIdx = 0
+        const page = rows.slice(startIdx, startIdx + pagination.pageSize)
+        set({ items: rows, filteredItems: page, pagination: { ...pagination, total: json.total || rows.length } })
       },
-      approve: (ids, reason) => {
-        set((s) => ({ items: s.items.map(d => ids.includes(d.id) ? { ...d, status: '已通过', content: reason ? `${d.content} | 理由:${reason}` : d.content } : d), selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }))
+      approve: async (ids, reason) => {
+        const operator = (useAuthStore.getState().user?.id) || ''
+        await Promise.all(ids.map(id => fetch(`${API_BASE}/approval/requests/${id}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve', reason, operator_id: operator }) })))
+        set((s) => ({ selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }))
+        await (get() as any).query()
       },
-      reject: (ids, reason) => {
-        set((s) => ({ items: s.items.map(d => ids.includes(d.id) ? { ...d, status: '已驳回', content: `${d.content} | 理由:${reason}` } : d), selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }))
+      reject: async (ids, reason) => {
+        const operator = (useAuthStore.getState().user?.id) || ''
+        await Promise.all(ids.map(id => fetch(`${API_BASE}/approval/requests/${id}/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject', reason, operator_id: operator }) })))
+        set((s) => ({ selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }))
+        await (get() as any).query()
       }
     }),
     { name: 'approval-store' }

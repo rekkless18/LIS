@@ -19,7 +19,7 @@ router.get('/', async (req: Request, res: Response) => {
   const supabase = getSupabase()
   const { data: users, error: e1 } = await supabase
     .from('users')
-    .select('id,account,name,user_type,status,last_login_at,last_password_change_at,created_at,role_ids_str')
+    .select('id,account,name,user_type,status,email,phone,department,last_login_at,last_password_change_at,created_at,role_ids_str')
   if (e1) return res.status(500).json({ success: false, error: e1.message })
   const userIds = (users || []).map((u: any) => u.id)
   let rolesByUser: Record<string, string[]> = {}
@@ -68,6 +68,9 @@ router.get('/', async (req: Request, res: Response) => {
     name: u.name,
     user_type: u.user_type,
     status: u.status,
+    email: u.email,
+    phone: u.phone,
+    department: u.department,
     last_login_at: u.last_login_at,
     last_password_change_at: u.last_password_change_at,
     created_at: u.created_at,
@@ -85,10 +88,10 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   if (!hasSupabaseEnv()) return res.status(503).json({ success: false, error: 'Supabase 未配置' })
   const supabase = getSupabase()
-  const { account, name, user_type, status, email, phone } = req.body
+  const { account, name, user_type, status, email, phone, department } = req.body
   const { data, error } = await supabase
     .from('users')
-    .insert([{ account, name, user_type, status, email, phone }])
+    .insert([{ account, name, user_type, status, email, phone, department }])
     .select('id')
     .single()
   if (error) return res.status(500).json({ success: false, error: error.message })
@@ -218,3 +221,20 @@ const makeHashFromPlain = (plain: string): { hash: string; algo: string } => {
   const key = crypto.scryptSync(plain, salt, 64).toString('hex')
   return { hash: `scrypt:${salt}:${key}`, algo: 'scrypt' }
 }
+/**
+ * 功能描述：获取指定用户详情（包含联系方式、邮箱、部门等）
+ * 参数说明：req.params.id：用户ID
+ * 返回值类型及用途：JSON：{ success, data }，data为用户对象
+ */
+router.get('/:id', async (req: Request, res: Response) => {
+  if (!hasSupabaseEnv()) return res.status(503).json({ success: false, error: 'Supabase 未配置' })
+  const supabase = getSupabase()
+  const { id } = req.params
+  const { data, error } = await supabase
+    .from('users')
+    .select('id,account,name,user_type,status,email,phone,department,last_login_at,last_password_change_at,created_at')
+    .eq('id', id)
+    .single()
+  if (error) return res.status(404).json({ success: false, error: error.message })
+  res.json({ success: true, data })
+})

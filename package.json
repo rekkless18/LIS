@@ -1,0 +1,12 @@
+{
+  "name": "lis-root",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "concurrently \"pnpm -C lis-frontend dev --host --port 5173\" \"pnpm -C lis-backend run server:dev\"",
+    "dev:npm": "concurrently \"npm --prefix lis-frontend run dev -- --host --port 5173\" \"npm --prefix lis-backend run server:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

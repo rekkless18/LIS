@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+let lastPackageController: AbortController | null = null;
 
 export type PackageType = '常规套餐' | '科研套餐' | 'VIP套餐';
 export type EnableStatus = '启用' | '禁用';
@@ -12,6 +14,7 @@ export interface PackageItem {
   productNames: string[];
   status: EnableStatus;
   createdAt?: string;
+  packageItems?: { productId: string; sampleType: string }[];
 }
 
 export interface PackageFilters {
@@ -72,7 +75,7 @@ const defaultPagination: PaginationConfig = { current: 1, pageSize: 20, total: 0
 export const usePackageConfigStore = create<State & Actions>()(
   persist(
     (set, get) => ({
-      items: mock,
+      items: [],
       filteredItems: [],
       selectedRowKeys: [],
       filters: defaultFilters,
@@ -81,26 +84,77 @@ export const usePackageConfigStore = create<State & Actions>()(
       setPagination: (p) => set((s) => ({ pagination: { ...s.pagination, ...p } })),
       setSelectedRowKeys: (k) => set({ selectedRowKeys: k }),
       resetFilters: () => set({ filters: defaultFilters }),
-      query: () => {
-        const { items, filters, pagination } = get();
-        let list = [...items];
-        if (filters.codes?.length) list = list.filter(d => filters.codes!.some(code => d.packageCode.includes(code)));
-        if (filters.nameKeyword) list = list.filter(d => d.packageName.includes(filters.nameKeyword!));
-        if (filters.types?.length) list = list.filter(d => filters.types!.includes(d.packageType));
-        if (filters.productNames?.length) list = list.filter(d => d.productNames.some(p => filters.productNames!.includes(p)));
-        if (filters.statuses?.length) list = list.filter(d => filters.statuses!.includes(d.status));
-        if (filters.createdRange?.[0] && filters.createdRange?.[1]) {
-          const [st, et] = filters.createdRange; list = list.filter(d => d.createdAt ? new Date(d.createdAt) >= new Date(st) && new Date(d.createdAt) <= new Date(et) : false);
-        }
-        const startIdx = (pagination.current - 1) * pagination.pageSize;
-        const page = list.slice(startIdx, startIdx + pagination.pageSize);
-        set({ filteredItems: page, pagination: { ...pagination, total: list.length } });
+      /** 函数功能：查询套餐列表并分页；参数：无；返回值：void；用途：调用后端接口并更新状态 */
+      query: async () => {
+        const { filters, pagination } = get();
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        const params = new URLSearchParams();
+        if (filters.codes?.length) params.set('codes', filters.codes.join(','));
+        if (filters.nameKeyword) params.set('nameKeyword', filters.nameKeyword);
+        if (filters.types?.length && !(filters.types.length === 3)) params.set('types', filters.types.join(','));
+        if (filters.statuses?.length && !(filters.statuses.length === 2)) params.set('statuses', filters.statuses.join(','));
+        if (filters.createdRange?.[0]) params.set('createdStart', filters.createdRange[0]);
+        if (filters.createdRange?.[1]) params.set('createdEnd', filters.createdRange[1]);
+        params.set('pageNo', String(pagination.current));
+        params.set('pageSize', String(pagination.pageSize));
+        try {
+          const resp = await fetch(`${API_BASE}/packages?${params.toString()}`);
+          if (!resp.ok) { set({ items: [], filteredItems: [], pagination: { ...pagination, total: 0 } }); return; }
+          const json = await resp.json();
+          const rows = (json.data || []).map((r: any) => ({
+            id: r.id,
+            packageCode: r.package_code,
+            packageName: r.package_name,
+            packageType: r.package_type,
+            productNames: r.product_names || [],
+            status: r.status === 'enabled' ? '启用' : '禁用',
+            createdAt: r.created_at,
+          })) as PackageItem[];
+          const f = filters;
+          const filtered = (f.productNames && f.productNames.length) ? rows.filter(d => d.productNames?.some((n) => f.productNames!.includes(n))) : rows;
+          set({ items: rows, filteredItems: filtered, pagination: { ...pagination, total: (json.total || rows.length) } });
+        } catch (e: any) { set({ items: [], filteredItems: [], pagination: { ...pagination, total: 0 } }); }
       },
-      createItem: (it) => { set((s) => ({ items: [{ id: `pk${Date.now()}`, ...it }, ...s.items] })); get().query(); },
-      editItem: (id, patch) => { set((s) => ({ items: s.items.map(d => d.id === id ? { ...d, ...patch } : d) })); get().query(); },
-      deleteItems: (ids) => { set((s) => ({ items: s.items.filter(d => !ids.includes(d.id)), selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) })); get().query(); },
-      enableItems: (ids) => { set((s) => ({ items: s.items.map(d => ids.includes(d.id) ? { ...d, status: '启用' } : d), selectedRowKeys: [] })); get().query(); },
-      disableItems: (ids) => { set((s) => ({ items: s.items.map(d => ids.includes(d.id) ? { ...d, status: '禁用' } : d), selectedRowKeys: [] })); get().query(); }
+      /** 函数功能：创建套餐；参数：除id外的套餐对象；返回值：void；用途：调用后端并刷新 */
+      createItem: async (it) => {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        const payload = { package_code: it.packageCode, package_name: it.packageName, package_type: it.packageType, status: it.status === '启用' ? 'enabled' : 'disabled', items: (it.packageItems || []).map(r => ({ product_id: r.productId, sample_type: r.sampleType })) };
+        await fetch(`${API_BASE}/packages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
+      },
+      /** 函数功能：编辑套餐；参数：套餐ID与修改字段；返回值：void；用途：调用后端并刷新 */
+      editItem: async (id, patch) => {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        const payload: any = {};
+        if (patch.packageCode) payload.package_code = patch.packageCode;
+        if (patch.packageName) payload.package_name = patch.packageName;
+        if (patch.packageType) payload.package_type = patch.packageType;
+        if (patch.status) payload.status = patch.status === '启用' ? 'enabled' : 'disabled';
+        if (patch.packageItems) payload.items = (patch.packageItems || []).map(r => ({ product_id: r.productId, sample_type: r.sampleType }));
+        await fetch(`${API_BASE}/packages/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
+      },
+      /** 函数功能：批量删除套餐；参数：套餐ID数组；返回值：void；用途：调用后端并刷新 */
+      deleteItems: async (ids) => {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        await fetch(`${API_BASE}/packages`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+        set({ selectedRowKeys: [] });
+        await get().query();
+      },
+      /** 函数功能：批量启用套餐；参数：套餐ID数组；返回值：void；用途：调用后端并刷新 */
+      enableItems: async (ids) => {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        await fetch(`${API_BASE}/packages/enable`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+        set({ selectedRowKeys: [] });
+        await get().query();
+      },
+      /** 函数功能：批量禁用套餐；参数：套餐ID数组；返回值：void；用途：调用后端并刷新 */
+      disableItems: async (ids) => {
+        const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+        await fetch(`${API_BASE}/packages/disable`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+        set({ selectedRowKeys: [] });
+        await get().query();
+      }
     }),
     { name: 'package-config-store' }
   )

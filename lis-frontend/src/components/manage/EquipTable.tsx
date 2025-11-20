@@ -18,8 +18,7 @@ export const EquipTable: React.FC = () => {
     { title: '生产厂家', dataIndex: 'manufacturer', key: 'manufacturer', width: 160, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-40">{text || ''}</span></Tooltip>) },
     { title: '购置日期', dataIndex: 'purchaseDate', key: 'purchaseDate', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
     { title: '上次维护日期', dataIndex: 'lastMaintenanceDate', key: 'lastMaintenanceDate', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
-    { title: '报废日期', dataIndex: 'scrapDate', key: 'scrapDate', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
-    { title: '责任人', dataIndex: 'owners', key: 'owners', width: 160, render: (arr: string[]) => (<Tooltip title={(arr || []).join(', ')}><span className="truncate block max-w-40">{(arr || []).join(', ')}</span></Tooltip>) }
+    { title: '报废日期', dataIndex: 'scrapDate', key: 'scrapDate', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) }
   ];
   const totalWidth = columns.reduce((sum, col) => sum + (typeof col.width === 'number' ? col.width : 120), 0);
   return (<Table rowKey="id" rowSelection={rowSelection} columns={columns} dataSource={filteredDevices} scroll={{ x: totalWidth }} pagination={false} />);

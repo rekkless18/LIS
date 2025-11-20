@@ -15,7 +15,11 @@ export const InventoryTable: React.FC = () => {
     { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-36">{text}</span></Tooltip>) },
     { title: '创建日期', dataIndex: 'createdDate', key: 'createdDate', width: 140, render: (text: string) => (<Tooltip title={fmt(text)}><span>{fmt(text)}</span></Tooltip>) },
     { title: '有效期', dataIndex: 'validPeriod', key: 'validPeriod', width: 140, render: (text: string) => (<Tooltip title={text}><span className="truncate block max-w-36">{text}</span></Tooltip>) },
-    { title: '库存阈值', dataIndex: 'threshold', key: 'threshold', width: 120 },
+    { title: '库存阈值', dataIndex: 'threshold', key: 'threshold', width: 180, render: (t: string) => {
+      const map: Record<string, string> = { '告罄': '告罄（剩余0%）', '低': '低（10%以下）', '中': '中（25%以下）', '高': '高（50%以下）' }
+      const text = map[t] || t
+      return (<Tooltip title={text}><span className="truncate block max-w-44">{text}</span></Tooltip>)
+    } },
     { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 120 }
   ]
   const totalWidth = columns.reduce((sum, col) => sum + (typeof col.width === 'number' ? col.width : 120), 0)

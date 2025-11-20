@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, Pagination } from 'antd';
 import { EnvSearchPanel } from '@/components/manage/EnvSearchPanel';
 import { EnvActionBar } from '@/components/manage/EnvActionBar';
@@ -14,7 +14,12 @@ import { useEnvironmentStore } from '@/stores/environment';
  */
 const EnvironmentManage: React.FC = (): React.ReactElement => {
   const { query, pagination, setPagination, resetFilters } = useEnvironmentStore();
-  useEffect(() => { query(); }, []);
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    query();
+  }, []);
   const handleSearch = () => { setPagination({ current: 1 }); query(); };
   const handleReset = () => { resetFilters(); setPagination({ current: 1 }); query(); };
   const onPageChange = (page: number, pageSize?: number) => { setPagination({ current: page, pageSize: pageSize || pagination.pageSize }); query(); };

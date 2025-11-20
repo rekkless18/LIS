@@ -54,22 +54,18 @@ interface Actions {
   setPagination: (p: Partial<PaginationConfig>) => void;
   /** 函数功能：设置选择行；参数：选中行主键数组；返回值：void；用途：更新选择状态 */
   setSelectedRowKeys: (k: string[]) => void;
-  /** 函数功能：执行查询；参数：无；返回值：void；用途：按filters过滤并分页 */
-  query: () => void;
-  /** 函数功能：新建设备；参数：设备数据；返回值：void；用途：添加记录并刷新 */
-  createDevice: (dev: Omit<Equipment, 'id'>) => void;
-  /** 函数功能：编辑设备；参数：设备ID与新数据；返回值：void；用途：更新记录并刷新 */
-  editDevice: (id: string, patch: Partial<Equipment>) => void;
-  /** 函数功能：删除设备；参数：设备ID数组；返回值：void；用途：删除记录并刷新 */
-  deleteDevices: (ids: string[]) => void;
+  /** 函数功能：执行查询；参数：无；返回值：Promise<void>；用途：调用后端接口并更新列表与分页 */
+  query: () => Promise<void>;
+  /** 函数功能：新建设备；参数：设备数据；返回值：Promise<void>；用途：调用后端创建并刷新列表 */
+  createDevice: (dev: Omit<Equipment, 'id'>) => Promise<void>;
+  /** 函数功能：编辑设备；参数：设备ID与新数据；返回值：Promise<void>；用途：调用后端更新并刷新列表 */
+  editDevice: (id: string, patch: Partial<Equipment>) => Promise<void>;
+  /** 函数功能：删除设备；参数：设备ID数组；返回值：Promise<void>；用途：调用后端删除并刷新列表 */
+  deleteDevices: (ids: string[]) => Promise<void>;
   resetFilters: () => void;
 }
 
-const mockDevices: Equipment[] = [
-  { id: 'd1', deviceNo: 'SEQ-001', deviceName: 'NovaSeq 6000', deviceType: '测序仪', status: '运行', location: '一号实验室', manufacturer: 'Illumina', purchaseDate: new Date('2023-03-01').toISOString(), owners: ['张三','李四'] },
-  { id: 'd2', deviceNo: 'QPCR-021', deviceName: 'ABI7500', deviceType: 'QPCR仪', status: '维护', location: '二号实验室', manufacturer: 'Thermo', lastMaintenanceDate: new Date('2024-07-20').toISOString(), owners: ['王五'] },
-  { id: 'd3', deviceNo: 'MS-110', deviceName: 'Orbitrap', deviceType: '质谱仪器', status: '关机', location: '质谱区A', manufacturer: 'Thermo', purchaseDate: new Date('2022-01-15').toISOString(), owners: ['赵六'] }
-];
+const mockDevices: Equipment[] = [];
 
 const defaultFilters: EquipmentFilters = {
   deviceTypes: ['测序仪','QPCR仪','离心机','培养箱','生化仪器','质谱仪器','血液仪器','冰箱','其他'],
@@ -84,6 +80,9 @@ const defaultPagination: PaginationConfig = {
   pageSizeOptions: ['10','20','50','100']
 };
 
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+let lastController: AbortController | null = null;
+
 export const useEquipmentStore = create<State & Actions>()(
   persist(
     (set, get) => ({
@@ -96,40 +95,89 @@ export const useEquipmentStore = create<State & Actions>()(
       setPagination: (p) => set((s) => ({ pagination: { ...s.pagination, ...p } })),
       setSelectedRowKeys: (k) => set({ selectedRowKeys: k }),
       resetFilters: () => set({ filters: defaultFilters }),
-      query: () => {
-        const { devices, filters, pagination } = get();
-        let list = [...devices];
-        if (filters.deviceNos?.length) list = list.filter(d => filters.deviceNos!.some(no => d.deviceNo.includes(no)));
-        if (filters.deviceNameKeyword) list = list.filter(d => d.deviceName.includes(filters.deviceNameKeyword!));
-        if (filters.deviceTypes?.length) list = list.filter(d => filters.deviceTypes!.includes(d.deviceType));
-        if (filters.statuses?.length) list = list.filter(d => filters.statuses!.includes(d.status));
-        if (filters.locationKeyword) list = list.filter(d => d.location.includes(filters.locationKeyword!));
-        if (filters.manufacturerKeyword) list = list.filter(d => (d.manufacturer || '').includes(filters.manufacturerKeyword!));
-        if (filters.purchaseRange?.[0] && filters.purchaseRange?.[1]) {
-          const [st, et] = filters.purchaseRange; list = list.filter(d => d.purchaseDate ? new Date(d.purchaseDate) >= new Date(st) && new Date(d.purchaseDate) <= new Date(et) : false);
+      /** 函数功能：执行查询；参数：无；返回值：Promise<void>；用途：调用后端接口并更新列表与分页 */
+      query: async () => {
+        const { filters, pagination } = get();
+        if (lastController) lastController.abort();
+        lastController = new AbortController();
+        const params = new URLSearchParams();
+        if (filters.deviceNos?.length) params.set('deviceNos', filters.deviceNos.join(','));
+        if (filters.deviceNameKeyword) params.set('deviceNameKeyword', filters.deviceNameKeyword);
+        if (filters.deviceTypes?.length) params.set('deviceTypes', filters.deviceTypes.join(','));
+        if (filters.statuses?.length) params.set('statuses', filters.statuses.join(','));
+        if (filters.locationKeyword) params.set('locationKeyword', filters.locationKeyword);
+        if (filters.manufacturerKeyword) params.set('manufacturerKeyword', filters.manufacturerKeyword);
+        if (filters.purchaseRange?.[0]) params.set('purchaseStart', filters.purchaseRange[0]);
+        if (filters.purchaseRange?.[1]) params.set('purchaseEnd', filters.purchaseRange[1]);
+        if (filters.maintenanceRange?.[0]) params.set('maintenanceStart', filters.maintenanceRange[0]);
+        if (filters.maintenanceRange?.[1]) params.set('maintenanceEnd', filters.maintenanceRange[1]);
+        if (filters.scrapRange?.[0]) params.set('scrapStart', filters.scrapRange[0]);
+        if (filters.scrapRange?.[1]) params.set('scrapEnd', filters.scrapRange[1]);
+        if (filters.owners?.length) params.set('owners', filters.owners.join(','));
+        params.set('pageNo', String(pagination.current));
+        params.set('pageSize', String(pagination.pageSize));
+        try {
+          const resp = await fetch(`${API_BASE}/equipment?${params.toString()}`, { signal: lastController.signal });
+          if (!resp.ok) {
+            set({ devices: [], filteredDevices: [], pagination: { ...pagination, total: 0 } });
+            return;
+          }
+          const json = await resp.json();
+          const rows = (json.data || []).map((r: any) => ({
+            id: r.id,
+            deviceNo: r.device_code,
+            deviceName: r.device_name,
+            deviceType: r.device_type_cn as DeviceType,
+            status: r.status_cn as DeviceStatus,
+            location: r.device_location,
+            manufacturer: r.manufacturer,
+            purchaseDate: r.purchase_date,
+            lastMaintenanceDate: r.last_maintenance_date,
+            scrapDate: r.scrap_date,
+            owners: r.owners || [],
+          })) as Equipment[];
+          set({ devices: rows, filteredDevices: rows, pagination: { ...pagination, total: json.total || rows.length } });
+        } catch (e: any) {
+          if (e?.name === 'AbortError') return;
+          set({ devices: [], filteredDevices: [], pagination: { ...pagination, total: 0 } });
         }
-        if (filters.maintenanceRange?.[0] && filters.maintenanceRange?.[1]) {
-          const [st, et] = filters.maintenanceRange; list = list.filter(d => d.lastMaintenanceDate ? new Date(d.lastMaintenanceDate) >= new Date(st) && new Date(d.lastMaintenanceDate) <= new Date(et) : false);
-        }
-        if (filters.scrapRange?.[0] && filters.scrapRange?.[1]) {
-          const [st, et] = filters.scrapRange; list = list.filter(d => d.scrapDate ? new Date(d.scrapDate) >= new Date(st) && new Date(d.scrapDate) <= new Date(et) : false);
-        }
-        if (filters.owners?.length) list = list.filter(d => (d.owners || []).some(o => filters.owners!.includes(o)));
-        const startIdx = (pagination.current - 1) * pagination.pageSize;
-        const page = list.slice(startIdx, startIdx + pagination.pageSize);
-        set({ filteredDevices: page, pagination: { ...pagination, total: list.length } });
       },
-      createDevice: (dev) => {
-        set((s) => ({ devices: [{ id: `d${Date.now()}`, ...dev }, ...s.devices] }));
-        get().query();
+      /** 函数功能：新建设备；参数：设备数据；返回值：Promise<void>；用途：调用后端创建并刷新列表 */
+      createDevice: async (dev) => {
+        const payload = {
+          device_code: dev.deviceNo,
+          device_name: dev.deviceName,
+          device_type: dev.deviceType,
+          device_status: dev.status,
+          device_location: dev.location,
+          manufacturer: dev.manufacturer,
+          purchase_date: dev.purchaseDate,
+          last_maintenance_date: dev.lastMaintenanceDate,
+          scrap_date: dev.scrapDate,
+        };
+        await fetch(`${API_BASE}/equipment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
       },
-      editDevice: (id, patch) => {
-        set((s) => ({ devices: s.devices.map(d => d.id === id ? { ...d, ...patch } : d) }));
-        get().query();
+      /** 函数功能：编辑设备；参数：设备ID与新数据；返回值：Promise<void>；用途：调用后端更新并刷新列表 */
+      editDevice: async (id, patch) => {
+        const payload: any = {};
+        if (patch.deviceNo) payload.device_code = patch.deviceNo;
+        if (patch.deviceName) payload.device_name = patch.deviceName;
+        if (patch.deviceType) payload.device_type = patch.deviceType;
+        if (patch.status) payload.device_status = patch.status;
+        if (patch.location) payload.device_location = patch.location;
+        if (typeof patch.manufacturer !== 'undefined') payload.manufacturer = patch.manufacturer;
+        if (typeof patch.purchaseDate !== 'undefined') payload.purchase_date = patch.purchaseDate;
+        if (typeof patch.lastMaintenanceDate !== 'undefined') payload.last_maintenance_date = patch.lastMaintenanceDate;
+        if (typeof patch.scrapDate !== 'undefined') payload.scrap_date = patch.scrapDate;
+        await fetch(`${API_BASE}/equipment/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
       },
-      deleteDevices: (ids) => {
-        set((s) => ({ devices: s.devices.filter(d => !ids.includes(d.id)), selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }));
-        get().query();
+      /** 函数功能：删除设备；参数：设备ID数组；返回值：Promise<void>；用途：调用后端删除并刷新列表 */
+      deleteDevices: async (ids) => {
+        await fetch(`${API_BASE}/equipment`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+        set({ selectedRowKeys: [] });
+        await get().query();
       }
     }),
     { name: 'equipment-store' }

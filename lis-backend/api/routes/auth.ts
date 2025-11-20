@@ -70,7 +70,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     const { data: userRow, error: userErr } = await supabase
       .from('users')
-      .select('id,account,name,email,role_ids_str')
+      .select('id,account,name,email')
       .eq('id', cred.user_id)
       .single()
     if (userErr) {
@@ -83,6 +83,30 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', userRow.id)
 
+    const { data: urRows, error: urErr } = await supabase
+      .from('user_roles')
+      .select('role_id,roles:role_id(role_code)')
+      .eq('user_id', userRow.id)
+    if (urErr) {
+      res.status(500).json({ success: false, error: urErr.message })
+      return
+    }
+    const roleIds = (urRows || []).map((r: any) => r.role_id)
+    const roleCodes = (urRows || []).map((r: any) => r.roles?.role_code).filter(Boolean)
+    let permKeys: string[] = []
+    if (roleIds.length) {
+      const { data: rpRows, error: rpErr } = await supabase
+        .from('role_permissions')
+        .select('permission_id,permissions:permission_id(perm_key)')
+        .in('role_id', roleIds)
+      if (rpErr) {
+        res.status(500).json({ success: false, error: rpErr.message })
+        return
+      }
+      const keysRaw = (rpRows || []).map((r: any) => r.permissions?.perm_key).filter(Boolean)
+      permKeys = Array.from(new Set(keysRaw.map((k: string) => (k === 'home' ? 'home.view' : k))))
+    }
+
     const token = 'mock-jwt-token-' + Date.now()
     const user = {
       id: String(userRow.id),
@@ -90,8 +114,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       name: userRow.name || userRow.account,
       email: userRow.email || '',
       avatar: '',
-      permissions: [],
-      roles: [],
+      permissions: permKeys,
+      roles: roleCodes,
     }
     res.json({ success: true, token, user })
   } catch (e: any) {

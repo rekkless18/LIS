@@ -45,22 +45,18 @@ interface Actions {
   setPagination: (p: Partial<PaginationConfig>) => void;
   /** 函数功能：设置选择行；参数：选中行主键数组；返回值：void；用途：更新选择状态 */
   setSelectedRowKeys: (k: string[]) => void;
-  /** 函数功能：执行查询；参数：无；返回值：void；用途：按filters过滤并分页 */
-  query: () => void;
-  /** 函数功能：新建房间；参数：房间数据；返回值：void；用途：添加记录并刷新 */
-  createRoom: (room: Omit<EnvRoom, 'id'>) => void;
-  /** 函数功能：编辑房间；参数：房间ID与新数据；返回值：void；用途：更新记录并刷新 */
-  editRoom: (id: string, patch: Partial<EnvRoom>) => void;
-  /** 函数功能：删除房间；参数：房间ID数组；返回值：void；用途：删除记录并刷新 */
-  deleteRooms: (ids: string[]) => void;
+  /** 函数功能：执行查询；参数：无；返回值：Promise<void>；用途：调用后端接口并更新列表与分页 */
+  query: () => Promise<void>;
+  /** 函数功能：新建房间；参数：房间数据；返回值：Promise<void>；用途：调用后端创建并刷新列表 */
+  createRoom: (room: Omit<EnvRoom, 'id'>) => Promise<void>;
+  /** 函数功能：编辑房间；参数：房间ID与新数据；返回值：Promise<void>；用途：调用后端更新并刷新列表 */
+  editRoom: (id: string, patch: Partial<EnvRoom>) => Promise<void>;
+  /** 函数功能：删除房间；参数：房间ID数组；返回值：Promise<void>；用途：调用后端删除并刷新列表 */
+  deleteRooms: (ids: string[]) => Promise<void>;
   resetFilters: () => void;
 }
 
-const mockRooms: EnvRoom[] = [
-  { id: 'r1', roomNo: 'A101', roomLocation: '一号楼一层东侧', status: '正常', protectionLevel: '一级', temperature: 22.5, humidity: 45, pressure: 101.3 },
-  { id: 'r2', roomNo: 'B205', roomLocation: '二号楼二层西侧', status: '异常', protectionLevel: '二级', temperature: 28.1, humidity: 60, pressure: 100.8 },
-  { id: 'r3', roomNo: 'C310', roomLocation: '三号楼三层中部', status: '正常', protectionLevel: '三级', temperature: 20.2, humidity: 40, pressure: 101.0 }
-];
+const mockRooms: EnvRoom[] = [];
 
 const defaultFilters: EnvFilters = {
   statuses: ['正常', '异常'],
@@ -75,6 +71,9 @@ const defaultPagination: PaginationConfig = {
   pageSizeOptions: ['10', '20', '50', '100']
 };
 
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+let lastController: AbortController | null = null;
+
 export const useEnvironmentStore = create<State & Actions>()(
   persist(
     (set, get) => ({
@@ -87,28 +86,67 @@ export const useEnvironmentStore = create<State & Actions>()(
       setPagination: (p) => set((s) => ({ pagination: { ...s.pagination, ...p } })),
       setSelectedRowKeys: (k) => set({ selectedRowKeys: k }),
       resetFilters: () => set({ filters: defaultFilters }),
-      query: () => {
-        const { rooms, filters, pagination } = get();
-        let list = [...rooms];
-        if (filters.roomNos?.length) list = list.filter(r => filters.roomNos!.some(no => r.roomNo.includes(no)));
-        if (filters.roomLocationKeyword) list = list.filter(r => r.roomLocation.includes(filters.roomLocationKeyword!));
-        if (filters.statuses?.length) list = list.filter(r => filters.statuses!.includes(r.status));
-        if (filters.protectionLevels?.length) list = list.filter(r => filters.protectionLevels!.includes(r.protectionLevel));
-        const startIdx = (pagination.current - 1) * pagination.pageSize;
-        const page = list.slice(startIdx, startIdx + pagination.pageSize);
-        set({ filteredRooms: page, pagination: { ...pagination, total: list.length } });
+      /** 函数功能：执行查询；参数：无；返回值：Promise<void>；用途：调用后端接口并更新列表与分页 */
+      query: async () => {
+        const { filters, pagination } = get();
+        if (lastController) lastController.abort();
+        lastController = new AbortController();
+        const params = new URLSearchParams();
+        if (filters.roomNos?.length) params.set('roomNos', filters.roomNos.join(','));
+        if (filters.roomLocationKeyword) params.set('roomLocationKeyword', filters.roomLocationKeyword);
+        if (filters.statuses?.length) params.set('statuses', filters.statuses.join(','));
+        if (filters.protectionLevels?.length) params.set('protectionLevels', filters.protectionLevels.join(','));
+        params.set('pageNo', String(pagination.current));
+        params.set('pageSize', String(pagination.pageSize));
+        try {
+          const resp = await fetch(`${API_BASE}/rooms?${params.toString()}`, { signal: lastController.signal });
+          if (!resp.ok) {
+            set({ rooms: [], filteredRooms: [], pagination: { ...pagination, total: 0 } });
+            return;
+          }
+          const json = await resp.json();
+          const rows = (json.data || []).map((r: any) => ({
+            id: r.id,
+            roomNo: r.room_code,
+            roomLocation: r.room_location,
+            status: r.status_cn as EnvStatus,
+            protectionLevel: r.protection_level_cn as ProtectionLevel,
+            temperature: r.temperature,
+            humidity: r.humidity,
+            pressure: r.pressure,
+          })) as EnvRoom[];
+          set({ rooms: rows, filteredRooms: rows, pagination: { ...pagination, total: json.total || rows.length } });
+        } catch (e: any) {
+          if (e?.name === 'AbortError') return;
+          set({ rooms: [], filteredRooms: [], pagination: { ...pagination, total: 0 } });
+        }
       },
-      createRoom: (room) => {
-        set((s) => ({ rooms: [{ id: `r${Date.now()}`, ...room }, ...s.rooms] }));
-        get().query();
+      /** 函数功能：新建房间；参数：房间数据；返回值：Promise<void>；用途：调用后端创建并刷新列表 */
+      createRoom: async (room) => {
+        const payload = {
+          room_code: room.roomNo,
+          room_location: room.roomLocation,
+          protection_level: room.protectionLevel,
+          status: room.status,
+        };
+        await fetch(`${API_BASE}/rooms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
       },
-      editRoom: (id, patch) => {
-        set((s) => ({ rooms: s.rooms.map(r => r.id === id ? { ...r, ...patch } : r) }));
-        get().query();
+      /** 函数功能：编辑房间；参数：房间ID与新数据；返回值：Promise<void>；用途：调用后端更新并刷新列表 */
+      editRoom: async (id, patch) => {
+        const payload: any = {};
+        if (patch.roomNo) payload.room_code = patch.roomNo;
+        if (patch.roomLocation) payload.room_location = patch.roomLocation;
+        if (patch.protectionLevel) payload.protection_level = patch.protectionLevel;
+        if (patch.status) payload.status = patch.status;
+        await fetch(`${API_BASE}/rooms/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        await get().query();
       },
-      deleteRooms: (ids) => {
-        set((s) => ({ rooms: s.rooms.filter(r => !ids.includes(r.id)), selectedRowKeys: s.selectedRowKeys.filter(k => !ids.includes(k)) }));
-        get().query();
+      /** 函数功能：删除房间；参数：房间ID数组；返回值：Promise<void>；用途：调用后端删除并刷新列表 */
+      deleteRooms: async (ids) => {
+        await fetch(`${API_BASE}/rooms`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) });
+        set({ selectedRowKeys: [] });
+        await get().query();
       }
     }),
     { name: 'environment-store' }

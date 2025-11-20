@@ -22,7 +22,7 @@ export const InventorySearchPanel: React.FC<Props> = ({ onSearch, onReset }) => 
       batchNoKeyword: filters.batchNoKeyword || '',
       createdDate: undefined,
       validPeriodKeyword: filters.validPeriodKeyword || '',
-      thresholds: filters.thresholds || thresholdOptions
+      thresholds: filters.thresholds || undefined
     })
   }, [filters, form])
 

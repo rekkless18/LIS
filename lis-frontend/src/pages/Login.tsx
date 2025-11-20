@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { message } from 'antd';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { useNavigate } from 'react-router-dom';
@@ -65,9 +66,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         onLogin(formData)
       }
       navigate('/home')
-    } catch (error) {
+    } catch (error: any) {
       console.error('登录失败:', error);
-      alert('登录失败，请检查用户名和密码');
+      const msg = error?.message || '登录失败，请检查用户名和密码'
+      message.error(msg)
     }
   };
 

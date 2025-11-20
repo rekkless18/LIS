@@ -15,7 +15,7 @@ export const CustomerActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
   const handleOpenCreate = () => { form.resetFields(); setOpenCreate(true); };
   const handleCreateSubmit = () => {
     form.validateFields().then(values => {
-      createItem({ customerCode: values.customerCode, customerName: values.customerName, customerType: values.customerType as CustomerType, regions: values.regions as Region[], status: values.status as EnableStatus });
+      createItem({ customerCode: values.customerCode, customerName: values.customerName, customerType: values.customerType as CustomerType, regions: values.regions ? [values.regions as Region] : [], status: values.status as EnableStatus });
       setOpenCreate(false);
       message.success('新建客户成功');
     });
@@ -25,13 +25,13 @@ export const CustomerActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
     if (selectedRowKeys.length !== 1) { message.warning('请选择且仅选择一个客户'); return; }
     const target = filteredItems.find(d => d.id === selectedRowKeys[0]);
     if (!target) { message.warning('未找到选中客户'); return; }
-    form.setFieldsValue({ customerCode: target.customerCode, customerName: target.customerName, customerType: target.customerType, regions: target.regions, status: target.status });
+    form.setFieldsValue({ customerCode: target.customerCode, customerName: target.customerName, customerType: target.customerType, regions: target.regions?.[0], status: target.status });
     setOpenEdit(true);
   };
   const handleEditSubmit = () => {
     const id = selectedRowKeys[0] as string;
     form.validateFields().then(values => {
-      editItem(id, { customerCode: values.customerCode, customerName: values.customerName, customerType: values.customerType as CustomerType, regions: values.regions as Region[], status: values.status as EnableStatus });
+      editItem(id, { customerCode: values.customerCode, customerName: values.customerName, customerType: values.customerType as CustomerType, regions: values.regions ? [values.regions as Region] : [], status: values.status as EnableStatus });
       setOpenEdit(false);
       message.success('编辑客户成功');
     });
@@ -60,7 +60,7 @@ export const CustomerActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
           <Form.Item label="客户编码" name="customerCode" rules={[{ required: true, message: '请输入客户编码' }]}><Input /></Form.Item>
           <Form.Item label="客户名称" name="customerName" rules={[{ required: true, message: '请输入客户名称' }]}><Input /></Form.Item>
           <Form.Item label="客户类型" name="customerType" rules={[{ required: true, message: '请选择客户类型' }]}><Select placeholder="请选择">{(['企业客户','高校客户','科研客户'] as CustomerType[]).map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item>
-          <Form.Item label="区域" name="regions" rules={[{ required: true, message: '请选择区域' }]}><Select mode="multiple" placeholder="请选择">{(['大陆','港澳台','西欧','东南亚','中东','北美','其他'] as Region[]).map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item>
+          <Form.Item label="区域" name="regions" rules={[{ required: true, message: '请选择区域' }]}><Select placeholder="请选择">{(['大陆','港澳台','西欧','东南亚','中东','北美','其他'] as Region[]).map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item>
           <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select placeholder="请选择">{(['启用','禁用'] as EnableStatus[]).map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item>
         </Form>
       </Modal>
@@ -70,7 +70,7 @@ export const CustomerActionBar: React.FC<Props> = ({ onQuery, onReset }) => {
           <Form.Item label="客户编码" name="customerCode" rules={[{ required: true, message: '请输入客户编码' }]}><Input /></Form.Item>
           <Form.Item label="客户名称" name="customerName" rules={[{ required: true, message: '请输入客户名称' }]}><Input /></Form.Item>
           <Form.Item label="客户类型" name="customerType" rules={[{ required: true, message: '请选择客户类型' }]}><Select placeholder="请选择">{(['企业客户','高校客户','科研客户'] as CustomerType[]).map(t => (<Option key={t} value={t}>{t}</Option>))}</Select></Form.Item>
-          <Form.Item label="区域" name="regions" rules={[{ required: true, message: '请选择区域' }]}><Select mode="multiple" placeholder="请选择">{(['大陆','港澳台','西欧','东南亚','中东','北美','其他'] as Region[]).map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item>
+          <Form.Item label="区域" name="regions" rules={[{ required: true, message: '请选择区域' }]}><Select placeholder="请选择">{(['大陆','港澳台','西欧','东南亚','中东','北美','其他'] as Region[]).map(r => (<Option key={r} value={r}>{r}</Option>))}</Select></Form.Item>
           <Form.Item label="状态" name="status" rules={[{ required: true, message: '请选择状态' }]}><Select placeholder="请选择">{(['启用','禁用'] as EnableStatus[]).map(s => (<Option key={s} value={s}>{s}</Option>))}</Select></Form.Item>
         </Form>
       </Modal>

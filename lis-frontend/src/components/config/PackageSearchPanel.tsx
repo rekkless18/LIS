@@ -14,6 +14,26 @@ export const PackageSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
   const [collapsed, setCollapsed] = useState(true);
   const typeOptions: PackageType[] = ['常规套餐','科研套餐','VIP套餐'];
   const statusOptions: EnableStatus[] = ['启用','禁用'];
+  const [productOptions, setProductOptions] = useState<{ id: string, product_name: string }[]>([]);
+  const [productsLoaded, setProductsLoaded] = useState(false);
+
+  /**
+   * 功能描述：加载已启用的产品名称作为下拉选项
+   * 参数说明：无
+   * 返回值类型及用途：无；更新本地选项状态
+   */
+  const loadEnabledProducts = async () => {
+    const API_BASE = (import.meta as any).env?.VITE_API_BASE || 'http://localhost:3001/api';
+    try {
+      const resp = await fetch(`${API_BASE}/products/enabled`);
+      if (!resp.ok) { setProductOptions([]); return; }
+      const json = await resp.json();
+      const raw = Array.isArray(json) ? json : (json?.data || []);
+      const mapped = (raw || []).map((p: any) => ({ id: p.id, product_name: p.product_name ?? p.productName })).filter((p: any) => p.product_name);
+      setProductOptions(mapped);
+      setProductsLoaded(true);
+    } catch { setProductOptions([]); }
+  };
 
   useEffect(() => {
     form.setFieldsValue({
@@ -25,6 +45,7 @@ export const PackageSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
       createdRange: undefined
     });
   }, [filters, form]);
+
 
   const handleSearch = () => {
     form.validateFields().then(values => {
@@ -55,8 +76,8 @@ export const PackageSearchPanel: React.FC<Props> = ({ onSearch, onReset }) => {
         {!collapsed && (
           <>
             <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}><Form.Item label="产品名称" name="productNames"><Select mode="multiple" placeholder="请选择产品" /></Form.Item></Col>
-              <Col xs={24} sm={12} md={6}><Form.Item label="创建日期" name="createdRange"><RangePicker format="YYYY-MM-DD" /></Form.Item></Col>
+              <Col xs={24} sm={12} md={6}><Form.Item label="产品名称" name="productNames"><Select mode="multiple" placeholder="请选择产品" onDropdownVisibleChange={(open) => { if (open && !productsLoaded) loadEnabledProducts(); }}>{productOptions.map(p => (<Option key={p.id} value={p.product_name}>{p.product_name}</Option>))}</Select></Form.Item></Col>
+              <Col xs={24} sm={12} md={6}><Form.Item label="创建日期" name="createdRange"><RangePicker format="YYYY-MM-DD" placeholder={["开始日期","结束日期"]} /></Form.Item></Col>
             </Row>
           </>
         )}

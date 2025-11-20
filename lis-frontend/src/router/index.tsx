@@ -423,6 +423,24 @@ const routes: RouteConfig[] = [
   }
 ];
 
+// 构建路径到权限映射（全路径 → 权限键）
+const pathPermissionMap: Record<string, string> = {};
+const buildPath = (base: string, seg: string) => {
+  const clean = (s: string) => s.replace(/^\/+|\/+$/g, '');
+  const b = clean(base);
+  const s = clean(seg);
+  return '/' + [b, s].filter(Boolean).join('/');
+};
+const walk = (list: RouteConfig[], base: string = '') => {
+  list.forEach((r) => {
+    const full = buildPath(base, r.path);
+    const perm = r.meta?.permission;
+    if (perm) pathPermissionMap[full] = perm;
+    if (r.children?.length) walk(r.children, full);
+  });
+};
+walk(routes);
+
 const router = createBrowserRouter(
   routes.map(route => ({
     ...route,
@@ -432,3 +450,4 @@ const router = createBrowserRouter(
 
 export default router;
 export type { RouteConfig, RouteMeta };
+export { pathPermissionMap };

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, Pagination } from 'antd';
 import { EquipSearchPanel } from '@/components/manage/EquipSearchPanel';
 import { EquipActionBar } from '@/components/manage/EquipActionBar';
@@ -14,7 +14,12 @@ import { useEquipmentStore } from '@/stores/equipment';
  */
 const EquipmentManage: React.FC = (): React.ReactElement => {
   const { query, pagination, setPagination, resetFilters } = useEquipmentStore();
-  useEffect(() => { query(); }, []);
+  const didInitRef = useRef(false);
+  useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    query();
+  }, []);
   const handleSearch = () => { setPagination({ current: 1 }); query(); };
   const handleReset = () => { resetFilters(); setPagination({ current: 1 }); query(); };
   const onPageChange = (page: number, pageSize?: number) => { setPagination({ current: page, pageSize: pageSize || pagination.pageSize }); query(); };

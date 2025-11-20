@@ -21,6 +21,16 @@ import authRoutes from './routes/auth.js'
 import permissionRoutes from './routes/permissions.js'
 import roleRoutes from './routes/roles.js'
 import userRoutes from './routes/users.js'
+import testItemRoutes from './routes/test-items.js'
+import productRoutes from './routes/products.js'
+import packageRoutes from './routes/packages.js'
+import customerRoutes from './routes/customers.js'
+import roomRoutes from './routes/rooms.js'
+import envReadingRoutes from './routes/environment-readings.js'
+import equipmentRoutes from './routes/equipment.js'
+import inventoryRoutes from './routes/inventory.js'
+import approvalRequestRoutes from './routes/approval-requests.js'
+import approvalFlowRoutes from './routes/approval-flows.js'
 
 // for esm mode
 const __filename = fileURLToPath(import.meta.url)
@@ -47,6 +57,16 @@ app.use('/api/auth', authRoutes)
 app.use('/api/permissions', permissionRoutes)
 app.use('/api/roles', roleRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/test-items', testItemRoutes)
+app.use('/api/products', productRoutes)
+app.use('/api/packages', packageRoutes)
+app.use('/api/customers', customerRoutes)
+app.use('/api/rooms', roomRoutes)
+app.use('/api/environment-readings', envReadingRoutes)
+app.use('/api/equipment', equipmentRoutes)
+app.use('/api/inventory', inventoryRoutes)
+app.use('/api/approval/requests', approvalRequestRoutes)
+app.use('/api/approval/flows', approvalFlowRoutes)
 
 /**
  * health
